@@ -1,0 +1,95 @@
+
+
+#include <DHT.h>
+#include <BH1750FVI.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#define DHT_PIN_SOIL 4
+#define DHT_PIN_AIR 5
+#define DHT_TYPE DHT22
+
+DHT dhtSoil(DHT_PIN_SOIL, DHT_TYPE);
+DHT dhtAir(DHT_PIN_AIR, DHT_TYPE);
+BH1750FVI lightMeter(0x23);
+const char* ssid = "Uc17_IoT";
+const char* password = "teleinformatika";
+WebServer server(80);
+
+void setup() {
+
+  Serial.begin(115200);
+  dhtSoil.begin();
+  dhtAir.begin();
+  lightMeter.begin();
+  Wire.begin();
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
+
+  }
+
+  Serial.println("WiFi connected.");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  server.on("/", handleRoot);
+  server.begin();
+  Serial.println("HTTP server started");
+
+}
+
+void loop() {
+
+  server.handleClient();
+  float humiditySoil = dhtSoil.readHumidity();
+  float temperatureSoil = dhtSoil.readTemperature();
+  float humidityAir = dhtAir.readHumidity();
+  float temperatureAir = dhtAir.readTemperature();
+  float lightLevel = lightMeter.readLightLevel();
+  if (isnan(humiditySoil) || isnan(temperatureSoil) || isnan(humidityAir) || isnan(temperatureAir)) {
+
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+
+  }
+
+  Serial.print("Soil Humidity: ");
+  Serial.print(humiditySoil);
+  Serial.print("%, Soil Temperature: ");
+  Serial.print(temperatureSoil);
+  Serial.println("°C");
+  Serial.print("Air Humidity: ");
+  Serial.print(humidityAir);
+  Serial.print("%, Air Temperature: ");
+  Serial.print(temperatureAir);
+  Serial.println("°C");
+  Serial.print("Light level: ");
+  Serial.println(lightLevel);
+  delay(2000);
+
+}
+
+void handleRoot() {
+
+  float humiditySoil = dhtSoil.readHumidity();
+  float temperatureSoil = dhtSoil.readTemperature();
+  float humidityAir = dhtAir.readHumidity();
+  float temperatureAir = dhtAir.readTemperature();
+  float lightLevel = lightMeter.readLightLevel();
+
+  String webpage = "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>Krtkový plašič</title></head><body>";
+
+  webpage += "<h1>Krtkový plašič</h1>";
+  webpage += "<h2>Informace o půdě:</h2>";
+  webpage += "<p>Teplota půdy: " + String(temperatureSoil) + "°C</p>";
+  webpage += "<p>Vlhkost půdy: " + String(humiditySoil) + "%</p>";
+  webpage += "<h2>Informace o vzduchu:</h2>";
+  webpage += "<p>Teplota vzduchu: " + String(temperatureAir) + "°C</p>";
+  webpage += "<p>Vlhkost vzduchu: " + String(humidityAir) + "%</p>";
+  webpage += "<h2>Intenzita slunce:</h2>";
+  webpage += "<p>" + String(lightLevel) + " lux</p>";
+  webpage += "</body></html>";
+  server.send(200, "text/html", webpage);
+
+}
